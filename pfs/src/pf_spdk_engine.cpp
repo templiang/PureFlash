@@ -11,6 +11,7 @@
 #include "pf_trace_defs.h"
 #include "spdk/trace.h"
 #include "spdk/env.h"
+#include "spdk/nvme.h"
 
 static __thread  pf_io_channel *tls_io_channel = NULL;
 
@@ -35,6 +36,13 @@ static void spdk_sync_io_complete(void* arg, const struct spdk_nvme_cpl* cpl)
 	return;
 }
 
+static void
+my_disconnected_qpair_cb(struct spdk_nvme_qpair *qpair, void *ctx)
+{
+    fprintf(stderr, "WARNING: qpair %p is disconnected, destroying it\n", qpair);
+    // spdk_nvme_ctrlr_free_io_qpair(qpair);
+}
+
 void PfspdkEngine::spdk_nvme_disconnected_qpair_cb(struct spdk_nvme_qpair* qpair, void* poll_group_ctx)
 {
 	return;
@@ -57,13 +65,19 @@ uint64_t PfspdkEngine::sync_write(void* buffer, uint64_t buf_size, uint64_t offs
 
 	rc = spdk_nvme_ns_cmd_write_with_md(ns->ns, tls_io_channel->qpair[0], buffer, NULL, lba, (uint32_t)lba_cnt,
 		spdk_sync_io_complete, &result, 0, 0, 0);
+	
+	// printf("tls_io_channel:%p, qid=%d\n",tls_io_channel, spdk_nvme_qpair_get_id(tls_io_channel->qpair[0]));
+	// if(ns)
+	// 	printf("spdk_nvme_ctrlr: %s, %s, %s\n",spdk_nvme_ctrlr_get_transport_id(ns->ctrlr)->trstring, 
+	// 	spdk_nvme_ctrlr_get_transport_id(ns->ctrlr)->traddr,
+	// 	spdk_nvme_ctrlr_get_transport_id(ns->ctrlr)->subnqn);
 	if (rc) {
 		S5LOG_ERROR("nvme write failed! rc = %d", rc);
 		return rc;
 	}
 
 	while (result == 0) {
-		rc = spdk_nvme_qpair_process_completions(tls_io_channel->qpair[0], 1);
+		rc = spdk_nvme_poll_group_process_completions(tls_io_channel->group, 0, my_disconnected_qpair_cb);
 		if (rc < 0) {
 			S5LOG_ERROR("NVMe io qpair process completion error, rc=%d", rc);
 			return rc;
@@ -91,7 +105,7 @@ uint64_t PfspdkEngine::sync_read(void* buffer, uint64_t buf_size, uint64_t offse
 	}
 
 	while (result == 0) {
-		rc = spdk_nvme_qpair_process_completions(tls_io_channel->qpair[0], 1);
+		rc = spdk_nvme_poll_group_process_completions(tls_io_channel->group, 0, my_disconnected_qpair_cb);
 		if (rc < 0) {
 			S5LOG_ERROR("NVMe io qpair process completion error, rc=%d", rc);
 			return rc;
@@ -146,6 +160,9 @@ int PfspdkEngine::poll_io(int* completions, void* arg)
 
 	if (!tls_io_channel)
 		return 0;
+
+	// 在此处影响性能，单独poll
+	spdk_nvme_ctrlr_process_admin_completions(spdk_nvme_qpair_get_ctrlr(tls_io_channel->qpair[0]));
 
 	num_completions = (int)spdk_nvme_poll_group_process_completions(tls_io_channel->group, 0, spdk_engine_disconnect_cb);
 	if (unlikely(num_completions < 0)) {
@@ -257,10 +274,12 @@ void PfspdkEngine::scc_complete(void* arg, const struct spdk_nvme_cpl* cpl)
 int PfspdkEngine::pf_spdk_io_channel_open(int num_qpairs)
 {
 	struct spdk_nvme_io_qpair_opts opts;
+	struct pf_io_channel *pic;
 	int rc;
 	int i;
 
-	struct pf_io_channel *pic = (struct pf_io_channel *)calloc(1, sizeof(struct pf_io_channel));
+	pic = (struct pf_io_channel *)calloc(1, sizeof(struct pf_io_channel));
+	
 	if (!pic) {
 		S5LOG_ERROR("Failed to alloc pf_io_channel");
 		return -ENOMEM;
@@ -275,9 +294,9 @@ int PfspdkEngine::pf_spdk_io_channel_open(int num_qpairs)
 	}
 
 	spdk_nvme_ctrlr_get_default_io_qpair_opts(ns->ctrlr, &opts, sizeof(opts));
-	opts.delay_cmd_submit = true;
+	// opts.delay_cmd_submit = true;
 	opts.create_only = true;
-	opts.async_mode = true;
+	// opts.async_mode = true;
 
 	pic->group = spdk_nvme_poll_group_create(NULL, NULL);
 	if (!pic->group) {
@@ -287,12 +306,14 @@ int PfspdkEngine::pf_spdk_io_channel_open(int num_qpairs)
 	}
 
 	for (i = 0; i < num_qpairs; i++) {
+		// if(pic->qpair[i]) continue;
 		pic->qpair[i] = spdk_nvme_ctrlr_alloc_io_qpair(ns->ctrlr, &opts, sizeof(opts));
 		if (pic->qpair[i] == NULL) {
 			rc = -EINVAL;
 			S5LOG_ERROR("failed to alloc io qpair, i=%d", i);
 			goto qpair_failed;
 		}
+		printf("pic:%p, qid[%d] = %d\n",pic, i, spdk_nvme_qpair_get_id(pic->qpair[i]));
 
 		if (spdk_nvme_poll_group_add(pic->group, pic->qpair[i])) {
 			rc = -EINVAL;
@@ -337,6 +358,7 @@ int PfspdkEngine::pf_spdk_io_channel_close(struct pf_io_channel *pic)
 	}
 
 	for (i = 0; i < pic->num_qpairs; i++) {
+		printf("pf_spdk_io_channel_close,pic=%p, qid=%d\n",pic, spdk_nvme_qpair_get_id(pic->qpair[i]));
 		spdk_nvme_ctrlr_free_io_qpair(pic->qpair[i]);
 	}
 

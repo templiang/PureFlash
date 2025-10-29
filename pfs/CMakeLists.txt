@@ -32,6 +32,7 @@ set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g -DDEBUG ")
 # so that rte_mempool can select the appropriate ops during mempool creation.
 # Use -Wl,--no-as-needed to prevent linker from dropping unused shared libraries
 set(LIBRTE_MEMPOOL_RING "-Wl,--no-as-needed -lrte_mempool_ring")
+set(LIBSPDK_SOCK_POSIX "-Wl,--no-as-needed -lspdk_sock_posix")
 set(SPDKLIBS spdk_nvme spdk_env_dpdk spdk_util spdk_log spdk_sock spdk_trace spdk_json spdk_jsonrpc spdk_rpc spdk_vfio_user)
 set(DPDKLIBS rte_eal rte_mempool rte_ring rte_telemetry rte_kvargs rte_pci rte_bus_pci)
 add_definitions(-D_XOPEN_SOURCE)
@@ -103,7 +104,7 @@ add_executable(pfs  ${S5AFS_SRC} ${HTTP_SRC} ${INCS})
 set_target_properties(pfs PROPERTIES SKIP_BUILD_RPATH true)
 #find_library(ZOOKEEPER_LIB NAMES libzookeeper_mt.a zookeeper_mt)
 
-TARGET_LINK_LIBRARIES(pfs rdmacm ibverbs pthread zookeeper_mt  hashtable uuid ${LIBRTE_MEMPOOL_RING} ${SPDKLIBS} ${DPDKLIBS} s5common nlohmann_json::nlohmann_json
+TARGET_LINK_LIBRARIES(pfs ${LIBSPDK_SOCK_POSIX} ${LIBRTE_MEMPOOL_RING} ${SPDKLIBS} ${DPDKLIBS} rdmacm ibverbs pthread zookeeper_mt  hashtable uuid s5common nlohmann_json::nlohmann_json
 	aio curl  ${THIRDPARTY}/isa-l_crypto/.libs/libisal_crypto.a libsgutils2.a)
 IF(WITH_IOURING)
 	TARGET_LINK_LIBRARIES(pfs  uring)

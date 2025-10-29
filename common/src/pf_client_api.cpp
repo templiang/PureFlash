@@ -38,7 +38,7 @@ size_t iov_from_buf(const struct iovec *iov, unsigned int iov_cnt, const void *b
 
 static const char* pf_lib_ver = "S5 client version:0x00010000";
 
-enum connection_type client_conn_type = RDMA_TYPE;
+enum connection_type client_conn_type = TCP_TYPE;
 
 #define CLIENT_TIMEOUT_CHECK_INTERVAL 1 //seconds
 #define RPC_TIMEOUT_SEC 2

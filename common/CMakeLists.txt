@@ -11,7 +11,7 @@ set(CMAKE_CXX_FLAGS   "-Wall -Wno-sign-compare -Wconversion -fPIC ${CXX_FLAG_GCO
 
 set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g ")
 set(CMAKE_CXX_COMPILER g++)
-set(SPDKLIBS spdk_nvme spdk_env_dpdk spdk_util spdk_log spdk_sock spdk_trace spdk_json spdk_jsonrpc spdk_rpc)
+set(SPDKLIBS spdk_sock_posix spdk_sock spdk_nvme spdk_env_dpdk spdk_util spdk_log spdk_trace spdk_json spdk_jsonrpc spdk_rpc)
 set(DPDKLIBS rte_eal rte_mempool rte_ring rte_telemetry rte_kvargs rte_pci rte_bus_pci rte_mempool_ring)
 
 add_definitions(-D_POSIX_C_SOURCE=200112L)
@@ -104,14 +104,14 @@ add_library(s5common STATIC  ${S5COMMON_SRC} ${INCS})
 set_target_properties(s5common PROPERTIES OUTPUT_NAME "s5common")
 set_target_properties(s5common PROPERTIES SKIP_BUILD_RPATH true)
 set_target_properties(s5common PROPERTIES CLEAN_DIRECT_OUTPUT 1)
-TARGET_LINK_LIBRARIES(s5common dl rdmacm ibverbs pthread  ${GCOV})
+TARGET_LINK_LIBRARIES(s5common dl rdmacm ibverbs pthread ${GCOV})
 
 add_executable(pfdd ${PFDD_SRC})
 
-TARGET_LINK_LIBRARIES(pfdd s5common rdmacm ibverbs ${SPDKLIBS} ${DPDKLIBS} pthread uuid zookeeper_mt hashtable curl aio ${GCOV})
+TARGET_LINK_LIBRARIES(pfdd s5common ${SPDKLIBS} ${DPDKLIBS} rdmacm ibverbs  pthread uuid zookeeper_mt hashtable curl aio ${GCOV})
 
 add_executable(aof_helper src/pf_aof_test_helper.cpp )
-TARGET_LINK_LIBRARIES(aof_helper s5common rdmacm ${SPDKLIBS} ${DPDKLIBS} ibverbs pthread uuid zookeeper_mt hashtable curl aio ${GCOV})
+TARGET_LINK_LIBRARIES(aof_helper s5common ${SPDKLIBS} ${DPDKLIBS} rdmacm ibverbs pthread uuid zookeeper_mt hashtable curl aio ${GCOV})
 add_custom_command(TARGET s5common POST_BUILD 
 	COMMAND cp -rpfu ${PREBUILD_LIB_DIR}/*.a ${LIBRARY_OUTPUT_PATH}/
 	COMMAND cp -rpfu ${THIRDPARTY}/spdk/build/lib/libspdk_rpc.so*  ${LIBRARY_OUTPUT_PATH}/
@@ -119,6 +119,7 @@ add_custom_command(TARGET s5common POST_BUILD
 	COMMAND cp -rpfu ${THIRDPARTY}/spdk/build/lib/libspdk_env_dpdk.so*  ${LIBRARY_OUTPUT_PATH}/
 	COMMAND cp -rpfu ${THIRDPARTY}/spdk/build/lib/libspdk_util.so*  ${LIBRARY_OUTPUT_PATH}/
 	COMMAND cp -rpfu ${THIRDPARTY}/spdk/build/lib/libspdk_log.so*  ${LIBRARY_OUTPUT_PATH}/
+	COMMAND cp -rpfu ${THIRDPARTY}/spdk/build/lib/libspdk_sock_posix.so*  ${LIBRARY_OUTPUT_PATH}/
 	COMMAND cp -rpfu ${THIRDPARTY}/spdk/build/lib/libspdk_sock.so*  ${LIBRARY_OUTPUT_PATH}/
 	COMMAND cp -rpfu ${THIRDPARTY}/spdk/build/lib/libspdk_trace.so*  ${LIBRARY_OUTPUT_PATH}/
 	COMMAND cp -rpfu ${THIRDPARTY}/spdk/build/lib/libspdk_json.so*  ${LIBRARY_OUTPUT_PATH}/

@@ -54,8 +54,8 @@ int PfSpdkQueue::init(const char* name, int size, enum spdk_ring_type mode)
     snprintf(mempool_name, sizeof(mempool_name), "msgpool_%s", name);
     msg_mempool = spdk_mempool_create(mempool_name, MEMPOOL_CACHE_SIZE * 2, sizeof(pf_spdk_msg), SPDK_MEMPOOL_DEFAULT_CACHE_SIZE, SPDK_ENV_SOCKET_ID_ANY);
     if (!msg_mempool) {
-        S5LOG_ERROR("Failed create spdk mempool for:%s", mempool_name);
         int err = errno;
+        S5LOG_ERROR("Failed create spdk mempool for:%s", mempool_name);
         switch (err) {
             case ENOMEM:
                 S5LOG_ERROR("Unable to create mempool: Not enough memory");

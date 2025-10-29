@@ -2552,6 +2552,9 @@ register_ns(struct spdk_nvme_ctrlr *ctrlr, struct ns_entry *entry)
 		return;
 	}
 
+	printf("  Namespace ID: %d size: %juGB\n", spdk_nvme_ns_get_id(ns),
+	       spdk_nvme_ns_get_size(ns) / 1000000000);
+
 	return ;
 }
 
@@ -2594,22 +2597,42 @@ attach_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
 	struct spdk_pci_device	*pci_dev;
 	struct spdk_pci_id	pci_id;
 	struct ns_entry *entry = (struct ns_entry*)cb_ctx;
+
+	if (trid->trtype != SPDK_NVME_TRANSPORT_PCIE) {
+		S5LOG_INFO("NVMe over Fabrics controller at %s:%s: %s\n",
+		       trid->traddr, trid->trsvcid, trid->subnqn);
+	} else {
+		if (spdk_pci_addr_parse(&pci_addr, trid->traddr) != 0) {
+			return;
+		}
+
+		pci_dev = spdk_nvme_ctrlr_get_pci_device(ctrlr);
+		if (!pci_dev) {
+			return;
+		}
+
+		pci_id = spdk_pci_device_get_id(pci_dev);
+
+		S5LOG_INFO("NVMe Controller at %04x:%02x:%02x.%x [%04x:%04x]\n",
+		       pci_addr.domain, pci_addr.bus,
+		       pci_addr.dev, pci_addr.func,
+		       pci_id.vendor_id, pci_id.device_id);
+	}
 	
+	// if (spdk_pci_addr_parse(&pci_addr, trid->traddr)) {
+	// 	return;
+	// }
 
-	if (spdk_pci_addr_parse(&pci_addr, trid->traddr)) {
-		return;
-	}
+	// pci_dev = spdk_nvme_ctrlr_get_pci_device(ctrlr);
+	// if (!pci_dev) {
+	// 	return;
+	// }
 
-	pci_dev = spdk_nvme_ctrlr_get_pci_device(ctrlr);
-	if (!pci_dev) {
-		return;
-	}
+	// pci_id = spdk_pci_device_get_id(pci_dev);
 
-	pci_id = spdk_pci_device_get_id(pci_dev);
-
-	S5LOG_INFO("Attached to NVMe Controller at %s [%04x:%04x]\n",
-			trid->traddr,
-			pci_id.vendor_id, pci_id.device_id);
+	// S5LOG_INFO("Attached to NVMe Controller at %s [%04x:%04x]\n",
+	// 		trid->traddr,
+	// 		pci_id.vendor_id, pci_id.device_id);
 
 	register_ctrlr(ctrlr, entry);
 }
